@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=CCSDS Cyberdeck
+Comment=GNU Radio kiosk wrapper
+Exec=/home/pi/myapp/run.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true
