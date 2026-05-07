@@ -313,9 +313,25 @@ class App(QtWidgets.QMainWindow):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    app.setStyleSheet("QPushButton { padding: 6px; font-size: 14px; }")
-    w = App()  # noqa: F841
-    sys.exit(app.exec_())
+    app.setStyle("Fusion")
+
+    palette = QtGui.QPalette()
+    palette.setColor(QtGui.QPalette.Window,          QtGui.QColor(35, 35, 38))
+    palette.setColor(QtGui.QPalette.WindowText,      QtCore.Qt.white)
+    palette.setColor(QtGui.QPalette.Base,            QtGui.QColor(25, 25, 28))
+    palette.setColor(QtGui.QPalette.AlternateBase,   QtGui.QColor(45, 45, 48))
+    palette.setColor(QtGui.QPalette.Text,            QtCore.Qt.white)
+    palette.setColor(QtGui.QPalette.Button,          QtGui.QColor(50, 50, 55))
+    palette.setColor(QtGui.QPalette.ButtonText,      QtCore.Qt.white)
+    palette.setColor(QtGui.QPalette.Highlight,       QtGui.QColor(60, 130, 200))
+    palette.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
+    app.setPalette(palette)
+
+    app.setStyleSheet("""
+        QPushButton { padding: 6px; font-size: 14px; }
+        QPushButton:checked { background: #c0392b; }
+        QFrame { background: #2a2a2e; border: 1px solid #444; border-radius: 4px; }
+    """)
 
 
 if __name__ == "__main__":
