@@ -1,29 +1,12 @@
-import multiprocessing
-import time
 import os
+import time
 import shutil
+import subprocess
+import sys
 import numpy as np
 
-def worker_process(nv):
-    # Run the flowgraph inside the isolated process
-    from validation_flow import validation_flow 
-    tb = validation_flow()
-    tb.set_noise_voltage(nv)
-    tb.start()
-    
-    # Record data for exactly 5 seconds
-    time.sleep(5)
-    
-    # Gracefully command the flowgraph to stop
-    tb.stop()
-    time.sleep(1)
-    
-    # CRITICAL: Forcefully sever the hardware connection 
-    # before the process closes, so the PlutoSDR is freed up.
-    del tb 
-    time.sleep(1)
-
 def run_automated_sweep():
+    # 20 test steps from 0.0V to 15.0V
     noise_voltages = np.linspace(0.0, 15.0, 20)
     
     # --- CRITICAL: THESE MUST MATCH YOUR GRC FILE SINKS EXACTLY ---
@@ -35,24 +18,43 @@ def run_automated_sweep():
     for nv in noise_voltages:
         print(f"--- Running Test: Noise Voltage = {nv:.2f} ---")
         
+        # Clean up old temporary files to prevent false positives
         if os.path.exists(temp_bits_file): os.remove(temp_bits_file)
         if os.path.exists(temp_symbols_file): os.remove(temp_symbols_file)
 
-        p = multiprocessing.Process(target=worker_process, args=(nv,))
-        p.start()
+        # 1. Write a disposable, standalone script for this exact test run
+        worker_code = f"""
+import time
+from validation_flow import validation_flow 
+tb = validation_flow()
+tb.set_noise_voltage({nv})
+tb.start()
+time.sleep(5)
+tb.stop()
+time.sleep(1)
+del tb
+"""
+        with open("temp_worker.py", "w") as f:
+            f.write(worker_code.strip())
+
+        # 2. Run the temporary script as a completely separate OS process
+        # sys.executable ensures it uses your exact Radioconda Python environment
+        process = subprocess.Popen([sys.executable, "temp_worker.py"])
         
-        # Wait up to 10 seconds for the 7-second worker to finish
-        p.join(timeout=10)
+        try:
+            # Wait up to 10 seconds for the 5-second task to finish cleanly
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            # 3. THE NUCLEAR OPTION: If the PlutoSDR hangs, OS-level assassination
+            process.kill()
+            process.wait()
+            print("Hardware freeze detected: OS forcefully terminated the worker.")
         
-        if p.is_alive():
-            p.terminate()
-            p.join()
-            print("Hardware freeze detected: Worker forcefully terminated.")
-        
-        time.sleep(1) 
+        time.sleep(1) # Brief pause for Windows file system to release locks
         
         safe_nv = f"{nv:.2f}".replace('.', 'p') 
         
+        # 4. Strict File Checking
         if os.path.exists(temp_bits_file):
             shutil.move(temp_bits_file, f"test_results/rx_bits_nv_{safe_nv}.bin")
             print(f"SUCCESS: Bits saved.")
@@ -65,9 +67,14 @@ def run_automated_sweep():
         else:
             print(f"FAIL: Could not find {temp_symbols_file}!")
             
-        # CRITICAL HARDWARE FIX: Give the PlutoSDR time to breathe
         print("Hardware cooldown: Waiting 4 seconds for PlutoSDR to release context...\n")
-        time.sleep(4) 
+        time.sleep(4)
+
+    # 5. Clean up the temporary worker file when the sweep is entirely finished
+    if os.path.exists("temp_worker.py"):
+        os.remove("temp_worker.py")
+        
+    print("Sweep complete. You can now run the analysis script.")
 
 if __name__ == '__main__':
     run_automated_sweep()
