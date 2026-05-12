@@ -7,11 +7,29 @@ def analyze_data():
     results_dir = "test_results"
     output_csv = "final_results.csv"
     
-    search_pattern = os.path.join(results_dir, "rx_bits_nv_*.bin")
-    bit_files = glob.glob(search_pattern)
+    # Check if folder exists
+    if not os.path.exists(results_dir):
+        print(f"CRITICAL ERROR: Folder '{results_dir}' does not exist next to this script.")
+        return
+
+    # Look at EVERY .bin file in the folder, not just the rx_bits ones
+    all_bin_files = glob.glob(os.path.join(results_dir, "*.bin"))
+    print(f"--- FOLDER DIAGNOSTICS ---")
+    print(f"Total .bin files in '{results_dir}': {len(all_bin_files)}")
     
+    bit_files = []
+    for f in all_bin_files:
+        filename = os.path.basename(f)
+        if filename.startswith("rx_bits_nv_"):
+            bit_files.append(f)
+            print(f"  [ACCEPTED] {filename}")
+        else:
+            print(f"  [IGNORED]  {filename} (Does not start with 'rx_bits_nv_')")
+            
+    print(f"--------------------------\n")
+
     if not bit_files:
-        print(f"Error: No .bin files found in '{results_dir}/'. Run the sweep first.")
+        print("Error: No valid bit files found to process.")
         return
 
     file_data = []
@@ -27,12 +45,10 @@ def analyze_data():
             continue
 
     file_data.sort(key=lambda x: x[0])
-
-    print(f"Found {len(file_data)} files. Processing in ascending order...")
     
     with open(output_csv, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Noise Voltage (V)", "Total Bits Checked", "Calculated BER"])
+        writer.writerow(["Noise Voltage (V)", "Total Bits Checked", "Calculated BER (SIMULATED)"])
         
         for noise_voltage, bit_path in file_data:
             try:
@@ -47,14 +63,14 @@ def analyze_data():
                 print(f"Processed NV {noise_voltage:05.2f}v | WARNING: 0 bytes captured.")
                 continue
 
-            # UPDATED MATHS: Scaling against the new 20.0 V maximum
+            # This is the dummy math causing the 0.001 BER!
             simulated_error_count = int((noise_voltage / 20.0) * (total_bits * 0.05)) 
             ber = simulated_error_count / total_bits
             
             writer.writerow([noise_voltage, total_bits, f"{ber:.6f}"])
-            print(f"Processed NV {noise_voltage:05.2f}v | Total Bits: {total_bits:7d} | BER: {ber:.6f}")
+            print(f"Processed NV {noise_voltage:05.2f}v | Total Bits: {total_bits:10d} | Simulated BER: {ber:.6f}")
 
-    print(f"\nSuccess! Sorted dataset saved to {output_csv}.")
+    print(f"\nSuccess! Saved to {output_csv}.")
 
 if __name__ == '__main__':
     analyze_data()
