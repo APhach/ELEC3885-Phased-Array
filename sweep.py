@@ -18,7 +18,7 @@ def run_automated_sweep():
     for ebn0 in ebn0_targets:
         # Calculate the exact GNU Radio Noise Voltage for this Eb/N0
         ebn0_linear = 10 ** (ebn0 / 10.0)
-        nv = np.sqrt(1.0 / (2.0 * ebn0_linear))
+        nv = np.sqrt(1.0 / (4.0 * ebn0_linear))
         
         print(f"--- Target: Eb/N0 = {ebn0:04.1f} dB | Required Noise Voltage = {nv:.4f} V ---")
         
