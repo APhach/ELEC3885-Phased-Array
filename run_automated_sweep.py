@@ -12,8 +12,8 @@ import numpy as np
 
 RESULTS_DIR = "test_results"
 
-TEMP_BITS_FILE = r"C:\path\to\your\temp_bits.bin"
-TEMP_SYMBOLS_FILE = r"C:\path\to\your\temp_symbols.bin"
+TEMP_BITS_FILE = r"/home/gdp-group-four/myapp/temp_bits.bin"
+TEMP_SYMBOLS_FILE = r"/home/gdp-group-four/myapp/temp_symbols.bin"
 
 FLOWGRAPH_MODULE = "validation_flow"
 FLOWGRAPH_CLASS = "validation_flow"
