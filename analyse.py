@@ -2,54 +2,75 @@ import os
 import glob
 import numpy as np
 import csv
+import math
 
-def analyze_data():
+def analyse_data():
     results_dir = "test_results"
-    output_csv = "final_results.csv"
+    output_csv = "final_ebn0_results.csv"
     
-    search_pattern = os.path.join(results_dir, "rx_bits_nv_*.bin")
+    # 1. Search for the new Eb/N0 filenames
+    search_pattern = os.path.join(results_dir, "rx_bits_ebn0_*.bin")
     bit_files = glob.glob(search_pattern)
     
     if not bit_files:
-        print("Error: No .bin files found.")
+        print("Error: No Eb/N0 .bin files found. Run the new sweep first.")
         return
 
     file_data = []
+    max_bits_found = 0  
+    
+    # 2. Extract Eb/N0 and establish hardware baseline
     for bit_path in bit_files:
         filename = os.path.basename(bit_path)
-        nv_str = filename.replace("rx_bits_nv_", "").replace(".bin", "").replace("p", ".")
+        # Convert 'rx_bits_ebn0_5p5.bin' -> '5.5'
+        ebn0_str = filename.replace("rx_bits_ebn0_", "").replace(".bin", "").replace("p", ".")
+        
         try:
-            file_data.append((float(nv_str), bit_path))
-        except ValueError:
+            ebn0_float = float(ebn0_str)
+            rx_data = np.fromfile(bit_path, dtype=np.uint8)
+            total_bits = len(rx_data) * 8
+            
+            if total_bits > max_bits_found:
+                max_bits_found = total_bits
+                
+            file_data.append((ebn0_float, bit_path, total_bits))
+        except Exception:
             continue
 
+    # Sort files mathematically by Eb/N0
     file_data.sort(key=lambda x: x[0])
+    
+    print(f"Hardware Baseline Established: {max_bits_found} bits maximum per 10s run.\n")
     
     with open(output_csv, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Noise Voltage (V)", "Total Bits Checked", "Calculated BER"])
+        writer.writerow(["Eb/N0 (dB)", "Total Bits Checked", "Calculated FER", "Theoretical QPSK BER"])
         
-        for noise_voltage, bit_path in file_data:
-            try:
-                rx_data = np.fromfile(bit_path, dtype=np.uint8)
-                total_bits = len(rx_data) * 8
-            except Exception:
-                continue
-                
-            # If the file is empty, the link failed completely
-            if total_bits == 0:
-                writer.writerow([noise_voltage, 0, "1.000000"]) 
-                print(f"NV {noise_voltage:04.2f}v | 0 bits (Link Dead)")
-                continue
-
-            # Adjusted maths for the 1.5 V ceiling
-            simulated_error_count = int((noise_voltage / 1.5) * (total_bits * 0.05)) 
-            ber = simulated_error_count / total_bits
+        for ebn0, bit_path, total_bits in file_data:
             
-            writer.writerow([noise_voltage, total_bits, f"{ber:.6f}"])
-            print(f"NV {noise_voltage:04.2f}v | Bits: {total_bits:7d} | BER: {ber:.6f}")
+            # --- FER CALCULATION ---
+            if max_bits_found == 0:
+                 fer = 1.0
+            elif total_bits == 0:
+                fer = 1.000000 
+            else:
+                fer = 1.0 - (total_bits / max_bits_found)
+                if fer < 0: fer = 0.0 
 
-    print(f"\nSaved to {output_csv}.")
+            # --- THEORETICAL BER CALCULATION (Your perfect waterfall curve) ---
+            # NOTE: Replace this block later with your NumPy cross-correlation math
+            # to calculate the REAL hardware BER.
+            ebn0_linear = 10.0 ** (ebn0 / 10.0)
+            theoretical_ber = 0.5 * math.erfc(math.sqrt(ebn0_linear))
+
+            # --- WRITE TO CSV ---
+            # Setting a floor at 1e-8 so the logarithmic graph doesn't crash on absolute zero
+            if theoretical_ber < 1e-8: theoretical_ber = 1e-8 
+            
+            writer.writerow([f"{ebn0:.1f}", total_bits, f"{fer:.6f}", f"{theoretical_ber:.8e}"])
+            print(f"Eb/N0: {ebn0:04.1f} dB | Bits: {total_bits:8d} | FER: {fer:.4f} | Ideal BER: {theoretical_ber:.2e}")
+
+    print(f"\nSuccess! Waterfall data saved to {output_csv}.")
 
 if __name__ == '__main__':
-    analyze_data()
+    analyse_data()
