@@ -28,7 +28,7 @@ def analyse_data():
         try:
             ebn0_float = float(ebn0_str)
             rx_data = np.fromfile(bit_path, dtype=np.uint8)
-            total_bits = len(rx_data) * 8
+            total_bits = len(rx_data)
             
             if total_bits > max_bits_found:
                 max_bits_found = total_bits
@@ -44,7 +44,7 @@ def analyse_data():
     
     with open(output_csv, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Eb/N0 (dB)", "Total Bits Checked", "Calculated FER", "Theoretical QPSK BER"])
+        writer.writerow(["Eb/N0 (dB)", "Total Bits Checked", "Capture Loss", "Theoretical QPSK BER"])
         
         for ebn0, bit_path, total_bits in file_data:
             
@@ -54,8 +54,9 @@ def analyse_data():
             elif total_bits == 0:
                 fer = 1.000000 
             else:
-                fer = 1.0 - (total_bits / max_bits_found)
-                if fer < 0: fer = 0.0 
+                capture_loss = 1.0 - (total_bits / max_bits_found)
+                if capture_loss <0:
+                    capture_loss = 0.0
 
             # --- THEORETICAL BER CALCULATION (Your perfect waterfall curve) ---
             # NOTE: Replace this block later with your NumPy cross-correlation math
@@ -67,8 +68,8 @@ def analyse_data():
             # Setting a floor at 1e-8 so the logarithmic graph doesn't crash on absolute zero
             if theoretical_ber < 1e-8: theoretical_ber = 1e-8 
             
-            writer.writerow([f"{ebn0:.1f}", total_bits, f"{fer:.6f}", f"{theoretical_ber:.8e}"])
-            print(f"Eb/N0: {ebn0:04.1f} dB | Bits: {total_bits:8d} | FER: {fer:.4f} | Ideal BER: {theoretical_ber:.2e}")
+            writer.writerow([f"{ebn0:.1f}", total_bits, f"{capture_loss:.6f}", f"{theoretical_ber:.8e}"])
+            print(f"Eb/N0: {ebn0:04.1f} dB | Bits: {total_bits:8d} | Capture loss: {capture_loss:.4f} | Ideal BER: {theoretical_ber:.2e}")
 
     print(f"\nSuccess! Waterfall data saved to {output_csv}.")
 
